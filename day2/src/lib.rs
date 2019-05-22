@@ -26,7 +26,7 @@ fn filter_unique_by_ocurrence_count(
   input: HashMap<char, usize>, 
   whitelist: &Vec<usize>
 ) -> Vec<usize> {
-  input
+  let mut v = input
     .into_iter()
     .filter(|&(_, value)| whitelist.contains(&value))
     .fold(Vec::new(), |mut vec, (_, value)| {
@@ -34,7 +34,10 @@ fn filter_unique_by_ocurrence_count(
         vec.push(value);
       }
       vec
-    })
+    });
+
+  v.sort();
+  v
 }
 
 pub fn calc_part1(input: &Vec<String>) -> usize {
@@ -51,6 +54,46 @@ pub fn calc_part1(input: &Vec<String>) -> usize {
     })
     .iter()
     .fold(1, |a, (_, b)| a * b)
+}
+
+fn hamming_distance(a: &String, b: &String) -> usize {
+  a
+    .chars()
+    .zip(b.chars())
+    .map(|(x, y)| if x == y { 0 } else { 1 })
+    .fold(0, |a, b| a + b)
+}
+
+fn strip_unique_chars(a: &String, b: &String) -> String {
+  a
+    .chars()
+    .zip(b.chars())
+    .filter_map(|(x, y)| if x == y { Some(x) } else { None })
+    .fold(String::new(), |mut acc, chr| {
+      acc.push(chr);
+      acc
+    })
+}
+
+pub fn calc_part2(input: &Vec<String>) -> String {
+  let (a, b) = input
+    .iter()
+    .take(input.len() - 1)
+    .enumerate()
+    .flat_map(|(i, a)| {
+      input
+        .iter()
+        .skip(i + 1)
+        .filter_map(move |b| if hamming_distance(a, b) == 1 {
+          Some((a, b))
+        } else {
+          None
+        })
+    })
+    .last()
+    .unwrap();
+
+  strip_unique_chars(a, b)
 }
 
 #[cfg(test)]
@@ -173,6 +216,112 @@ mod tests {
         String::from("ababab"),
       ]),
       12
+    );
+  }
+
+  #[test]
+  fn hamming_distance_test() {
+    assert_eq!(
+      hamming_distance(&String::from("fghij"), &String::from("klmno")),
+      5
+    );
+
+    assert_eq!(
+      hamming_distance(&String::from("karolin"), &String::from("kathrin")),
+      3
+    );
+
+    assert_eq!(
+      hamming_distance(&String::from("karolin"), &String::from("kerstin")),
+      3
+    );
+
+    assert_eq!(
+      hamming_distance(&String::from("1011101"), &String::from("1001001")),
+      2
+    );
+
+    assert_eq!(
+      hamming_distance(&String::from("2173896"), &String::from("2233796")),
+      3
+    );
+  }
+
+  #[test]
+  fn strip_unique_chars_test() {
+    assert_eq!(
+      strip_unique_chars(&String::from("fghij"), &String::from("fguij")), 
+      String::from("fgij")
+    );
+
+    assert_eq!(
+      strip_unique_chars(&String::from("0011001"), &String::from("1011001")), 
+      String::from("011001")
+    );
+
+    assert_eq!(
+      strip_unique_chars(&String::from(""), &String::from("")), 
+      String::from("")
+    );
+
+    assert_eq!(
+      strip_unique_chars(&String::from("a"), &String::from("b")), 
+      String::from("")
+    );
+  }
+
+  #[test]
+  fn calc_part2_test() {
+    assert_eq!(
+      calc_part2(&vec![
+        String::from("abcde"),
+        String::from("fghij"),
+        String::from("klmno"),
+        String::from("pqrst"),
+        String::from("fguij"),
+        String::from("axcye"),
+        String::from("wvxyz"),
+      ]),
+      String::from("fgij")
+    );
+
+    assert_eq!(
+      calc_part2(&vec![
+        String::from("fghij"),
+        String::from("fguij"),
+        String::from("abcde"),
+        String::from("klmno"),
+        String::from("pqrst"),
+        String::from("axcye"),
+        String::from("wvxyz"),
+      ]),
+      String::from("fgij")
+    );
+
+    assert_eq!(
+      calc_part2(&vec![
+        String::from("abcde"),
+        String::from("klmno"),
+        String::from("pqrst"),
+        String::from("axcye"),
+        String::from("wvxyz"),
+        String::from("fghij"),
+        String::from("fguij"),
+      ]),
+      String::from("fgij")
+    );
+
+    assert_eq!(
+      calc_part2(&vec![
+        String::from("fghij"),
+        String::from("abcde"),
+        String::from("klmno"),
+        String::from("pqrst"),
+        String::from("axcye"),
+        String::from("wvxyz"),
+        String::from("fguij"),
+      ]),
+      String::from("fgij")
     );
   }
 }
