@@ -5,15 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "(Windows) Launch",
-      "type": "cppvsdbg",
+      "type": "lldb",
       "request": "launch",
-      "program": "enter program name, for example ${workspaceFolder}/a.exe",
+      "name": "Debug",
+      "program": "${workspaceFolder}/target/debug/day3",
       "args": [],
-      "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
-      "environment": [],
-      "externalConsole": true
+      "preLaunchTask": "cargo build"
     }
   ]
 }
