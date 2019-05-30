@@ -5,6 +5,7 @@ use regex::Regex;
 
 #[derive(Debug, PartialEq)]
 pub struct Claim {
+  id: usize,
   start_x: usize,
   start_y: usize,
   len_x: usize,
@@ -12,7 +13,7 @@ pub struct Claim {
 }
 
 fn parse(input: &String) -> Result<Claim, String> {
-  let re = Regex::new(r".*@\s(\d+),(\d+):\s(\d+)x(\d+)")
+  let re = Regex::new(r"#(\d+)\s@\s(\d+),(\d+):\s(\d+)x(\d+)")
     .map_err(|e| e.to_string())?;
 
   let caps = re
@@ -28,10 +29,11 @@ fn parse(input: &String) -> Result<Claim, String> {
     .collect::<Result<Vec<usize>, _>>()?;
 
   Ok(Claim { 
-    start_x: matches[0], 
-    start_y: matches[1], 
-    len_x: matches[2],
-    len_y: matches[3],
+    id: matches[0],
+    start_x: matches[1], 
+    start_y: matches[2], 
+    len_x: matches[3],
+    len_y: matches[4],
   })
 }
 
@@ -52,7 +54,7 @@ pub fn calc_part1(claims: &Vec<Claim>) -> usize {
       (max(size_x, claim.start_x + claim.len_x), max(size_y, claim.start_y + claim.len_y))
     });
 
-  let fabric = claims
+  claims
     .iter()
     .fold(vec![0; size_x * size_y], |mut fabric, claim| {
       for i in claim.start_x..(claim.start_x + claim.len_x) {
@@ -62,12 +64,33 @@ pub fn calc_part1(claims: &Vec<Claim>) -> usize {
       }
 
       fabric
-    });
-
-  fabric
+    })
     .iter()
     .filter(|&n| *n > 1)
     .count()
+}
+
+pub fn calc_part2(claims: &Vec<Claim>) -> usize {
+  let (size_x, size_y) = claims
+    .iter()
+    .fold((0_usize, 0_usize), |(size_x, size_y), claim| {
+      (max(size_x, claim.start_x + claim.len_x), max(size_y, claim.start_y + claim.len_y))
+    });
+
+  claims
+    .iter()
+    .fold(vec![Vec::new(); size_x * size_y], |mut fabric, claim| {
+      for i in claim.start_x..(claim.start_x + claim.len_x) {
+        for j in claim.start_y..(claim.start_y + claim.len_y) {
+          fabric[j * size_x + i].push(claim.id);
+        }
+      }
+
+      fabric
+    })
+    .iter()
+    .find(|v| v.len() == 1)
+    .unwrap()[0]
 }
 
 #[cfg(test)]
@@ -78,27 +101,27 @@ mod tests {
   fn parse_test() {
     assert_eq!(
       parse(&String::from("#1 @ 1,1: 1x1")).unwrap(), 
-      Claim { start_x: 1, start_y: 1, len_x: 1, len_y: 1 }
+      Claim { id: 1, start_x: 1, start_y: 1, len_x: 1, len_y: 1 }
     );
 
     assert_eq!(
       parse(&String::from("#1 @ 1,1: 1x2")).unwrap(), 
-      Claim { start_x: 1, start_y: 1, len_x: 1, len_y: 2 }
+      Claim { id: 1, start_x: 1, start_y: 1, len_x: 1, len_y: 2 }
     );
 
     assert_eq!(
       parse(&String::from("#1 @ 1,1: 2x1")).unwrap(), 
-      Claim { start_x: 1, start_y: 1, len_x: 2, len_y: 1 }
+      Claim { id: 1, start_x: 1, start_y: 1, len_x: 2, len_y: 1 }
     );
 
     assert_eq!(
       parse(&String::from("#1 @ 3,2: 5x4")).unwrap(), 
-      Claim { start_x: 3, start_y: 2, len_x: 5, len_y: 4 }
+      Claim { id: 1, start_x: 3, start_y: 2, len_x: 5, len_y: 4 }
     );
 
     assert_eq!(
       parse(&String::from("#1 @ 5,5: 2x2")).unwrap(), 
-      Claim { start_x: 5, start_y: 5, len_x: 2, len_y: 2 }
+      Claim { id: 1, start_x: 5, start_y: 5, len_x: 2, len_y: 2 }
     );
     
     assert_eq!(parse(&String::from("#1 @ 1,1: 1x")).is_ok(), false);
@@ -121,14 +144,14 @@ mod tests {
   #[test]
   fn calc_part1_test() {
     assert_eq!(calc_part1(&vec![
-      Claim { start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
-      Claim { start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
-      Claim { start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
+      Claim { id: 1, start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
+      Claim { id: 1, start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
+      Claim { id: 1, start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
     ]), 4);
 
     assert_eq!(calc_part1(&vec![
-      Claim { start_x: 1, start_y: 1, len_x: 1, len_y: 2 },
-      Claim { start_x: 1, start_y: 2, len_x: 2, len_y: 1 },
+      Claim { id: 1, start_x: 1, start_y: 1, len_x: 1, len_y: 2 },
+      Claim { id: 1, start_x: 1, start_y: 2, len_x: 2, len_y: 1 },
     ]), 1);
   }
 }
