@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::cmp::max;
+use std::collections::HashMap;
 use regex::Regex;
 
 #[derive(Debug, PartialEq)]
@@ -37,6 +38,20 @@ fn parse(input: &String) -> Result<Claim, String> {
   })
 }
 
+fn collide(a: &Claim, b: &Claim) -> bool {
+  let a_end_x = a.start_x + a.len_x;
+  let a_end_y = a.start_y + a.len_y;
+  let b_end_x = b.start_x + b.len_x;
+  let b_end_y = b.start_y + b.len_y;
+
+  let cond0 = a.start_x < b_end_x;
+  let cond1 = a_end_x > b.start_x;
+  let cond2 = a.start_y < b_end_y;
+  let cond3 = a_end_y > b.start_y;
+
+  cond0 && cond1 && cond2 && cond3
+}
+
 pub fn read_input(filepath: &str) -> Result<Vec<Claim>, String> {
   let file = File::open(filepath).map_err(|e| e.to_string())?;
   let claim_results = BufReader::new(file)
@@ -71,29 +86,29 @@ pub fn calc_part1(claims: &Vec<Claim>) -> usize {
 }
 
 pub fn calc_part2(claims: &Vec<Claim>) -> usize {
-  let (size_x, size_y) = claims
-    .iter()
-    .fold((0_usize, 0_usize), |(size_x, size_y), claim| {
-      (max(size_x, claim.start_x + claim.len_x), max(size_y, claim.start_y + claim.len_y))
-    });
+  let mut memo = HashMap::new();
 
   claims
     .iter()
-    .fold(vec![(0, None); size_x * size_y], |mut fabric, claim| {
-      for i in claim.start_x..(claim.start_x + claim.len_x) {
-        for j in claim.start_y..(claim.start_y + claim.len_y) {
-          let idx = j * size_x + i;
-          fabric[idx].0 += 1;
-          fabric[idx].1 = fabric[idx].1.or(Some(claim.id));
-        }
-      }
-
-      fabric
+    .find(|claim_a| {
+      claims
+        .iter()
+        .filter(|claim_b| claim_a != claim_b)
+        .all(|claim_b| {
+          if memo.contains_key(&(claim_a.id, claim_b.id)) {
+            *memo.get(&(claim_a.id, claim_b.id)).unwrap()
+          } else if memo.contains_key(&(claim_b.id, claim_a.id)) {
+            *memo.get(&(claim_b.id, claim_a.id)).unwrap()
+          } else {
+            let b = !collide(&claim_a, &claim_b);
+            memo.insert((claim_a.id, claim_b.id), b);
+            memo.insert((claim_b.id, claim_a.id), b);
+            b
+          }
+        }) 
     })
-    .iter()
-    .find(|(n, _)| *n == 1)
-    .map(|(_, id)| id.unwrap())
     .unwrap()
+    .id
 }
 
 #[cfg(test)]
@@ -156,5 +171,59 @@ mod tests {
       Claim { id: 1, start_x: 1, start_y: 1, len_x: 1, len_y: 2 },
       Claim { id: 1, start_x: 1, start_y: 2, len_x: 2, len_y: 1 },
     ]), 1);
+  }
+
+  #[test]
+  fn collide_test() {
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 0, start_y: 0, len_x: 3, len_y: 3 },
+      &Claim { id: 2, start_x: 3, start_y: 3, len_x: 3, len_y: 3 },
+    ),
+    false);
+
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 0, start_y: 0, len_x: 3, len_y: 3 },
+      &Claim { id: 2, start_x: 2, start_y: 2, len_x: 3, len_y: 3 },
+    ),
+    true);
+
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 0, start_y: 0, len_x: 1, len_y: 2 },
+      &Claim { id: 2, start_x: 0, start_y: 1, len_x: 2, len_y: 1 },
+    ),
+    true);
+
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 10, start_y: 5, len_x: 1, len_y: 7 },
+      &Claim { id: 2, start_x: 0, start_y: 4, len_x: 4, len_y: 9 },
+    ),
+    false);
+
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
+      &Claim { id: 3, start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
+      // &Claim { id: 2, start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
+    ), true);
+
+    assert_eq!(collide(
+      &Claim { id: 1, start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
+      // &Claim { id: 3, start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
+      &Claim { id: 2, start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
+    ), false);
+
+    assert_eq!(collide(
+      // &Claim { id: 1, start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
+      &Claim { id: 3, start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
+      &Claim { id: 2, start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
+    ), false);
+  }
+
+  #[test]
+  fn calc_part2_test() {
+    assert_eq!(calc_part2(&vec![
+      Claim { id: 1, start_x: 1, start_y: 3, len_x: 4, len_y: 4 },
+      Claim { id: 2, start_x: 3, start_y: 1, len_x: 4, len_y: 4 },
+      Claim { id: 3, start_x: 5, start_y: 5, len_x: 2, len_y: 2 },
+    ]), 3);
   }
 }
