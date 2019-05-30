@@ -79,18 +79,21 @@ pub fn calc_part2(claims: &Vec<Claim>) -> usize {
 
   claims
     .iter()
-    .fold(vec![Vec::new(); size_x * size_y], |mut fabric, claim| {
+    .fold(vec![(0, None); size_x * size_y], |mut fabric, claim| {
       for i in claim.start_x..(claim.start_x + claim.len_x) {
         for j in claim.start_y..(claim.start_y + claim.len_y) {
-          fabric[j * size_x + i].push(claim.id);
+          let idx = j * size_x + i;
+          fabric[idx].0 += 1;
+          fabric[idx].1 = fabric[idx].1.or(Some(claim.id));
         }
       }
 
       fabric
     })
     .iter()
-    .find(|v| v.len() == 1)
-    .unwrap()[0]
+    .find(|(n, _)| *n == 1)
+    .map(|(_, id)| id.unwrap())
+    .unwrap()
 }
 
 #[cfg(test)]
