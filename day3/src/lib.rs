@@ -95,13 +95,10 @@ pub fn calc_part2(claims: &Vec<Claim>) -> usize {
         .iter()
         .filter(|claim_b| claim_a != claim_b)
         .all(|claim_b| {
-          if memo.contains_key(&(claim_a.id, claim_b.id)) {
-            *memo.get(&(claim_a.id, claim_b.id)).unwrap()
-          } else if memo.contains_key(&(claim_b.id, claim_a.id)) {
+          if memo.contains_key(&(claim_b.id, claim_a.id)) {
             *memo.get(&(claim_b.id, claim_a.id)).unwrap()
           } else {
             let b = !collide(&claim_a, &claim_b);
-            memo.insert((claim_a.id, claim_b.id), b);
             memo.insert((claim_b.id, claim_a.id), b);
             b
           }
