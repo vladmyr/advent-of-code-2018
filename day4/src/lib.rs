@@ -1,11 +1,12 @@
 use std::cmp::{Ordering, max};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
-use std::time::Duration;
 use std::collections::HashMap;
 
 use regex::Regex;
+
 use chrono::prelude::*;
+use chrono::Duration;
 
 #[derive(Debug, PartialEq)]
 enum Action {
@@ -104,9 +105,8 @@ fn filter_map_asleep(records: &Vec<Record>) -> Vec<AsleepRecord> {
         },
         Action::WakeUp => {
           // ToDo: is this enough to fully describe the problem?
-          let duration = Duration::new(
-            (r.datetime.time().minute() - start.time().minute()) as u64, 
-            0
+          let duration = Duration::minutes(
+            (r.datetime.time().minute() - start.time().minute()) as i64
           );
           
           Some(Some(AsleepRecord {
@@ -127,7 +127,7 @@ fn find_sleepiest(records: &Vec<AsleepRecord>) -> Option<usize> {
     .iter()
     .fold(HashMap::new() as HashMap<usize, u64>, |mut map, r| {
       let entry = map.entry(r.id).or_insert(0);
-      *entry += r.duration.as_secs();
+      *entry += r.duration.num_minutes() as u64;
 
       map
     })
@@ -140,6 +140,24 @@ fn find_sleepiest(records: &Vec<AsleepRecord>) -> Option<usize> {
       }
     })
     .map(|(id, _)| id)
+}
+
+fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<DateTime<Utc>> {
+  let a_end = a.datetime.checked_add_signed(a.duration)?;
+  let b_end = b.datetime.checked_add_signed(b.duration)?;
+    
+  println!("{:?}, {:?}", a_end, b_end);
+
+  match (
+    a.datetime.time().lt(&b.datetime.time()) 
+      && b.datetime.time().lt(&a_end.time()),
+    b.datetime.time().lt(&a.datetime.time())
+      && a.datetime.time().lt(&b_end.time()),
+  ) {
+    (false, true) => Some(a.datetime),
+    (true, false) => Some(b.datetime),
+    _ => None,
+  }
 }
 
 #[cfg(test)]
@@ -255,32 +273,32 @@ mod tests {
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
-        duration: Duration::new(20, 0)
+        duration: Duration::minutes(20)
       },
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 1).and_hms(0, 30, 0),
-        duration: Duration::new(25, 0)
+        duration: Duration::minutes(25)
       },
       AsleepRecord { 
         id: 99, 
         datetime: Utc.ymd(1518, 11, 2).and_hms(0, 40, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
-        duration: Duration::new(5, 0)
+        duration: Duration::minutes(5)
       },
       AsleepRecord { 
         id: 99, 
         datetime: Utc.ymd(1518, 11, 4).and_hms(0, 36, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
       AsleepRecord {
         id: 99,
         datetime: Utc.ymd(1518, 11, 5).and_hms(0, 45, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
     ]);
   }
@@ -291,33 +309,53 @@ mod tests {
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
-        duration: Duration::new(20, 0)
+        duration: Duration::minutes(20)
       },
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 1).and_hms(0, 30, 0),
-        duration: Duration::new(25, 0)
+        duration: Duration::minutes(25)
       },
       AsleepRecord { 
         id: 99, 
         datetime: Utc.ymd(1518, 11, 2).and_hms(0, 40, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
       AsleepRecord { 
         id: 10, 
         datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
-        duration: Duration::new(5, 0)
+        duration: Duration::minutes(5)
       },
       AsleepRecord { 
         id: 99, 
         datetime: Utc.ymd(1518, 11, 4).and_hms(0, 36, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
       AsleepRecord {
         id: 99,
         datetime: Utc.ymd(1518, 11, 5).and_hms(0, 45, 0),
-        duration: Duration::new(10, 0)
+        duration: Duration::minutes(10)
       },
     ]));
+  }
+
+  #[test]
+  fn find_intersection_beginning_test() {
+    let a = AsleepRecord { 
+      id: 10, 
+      datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
+      duration: Duration::minutes(20)
+    };
+
+    let b = AsleepRecord { 
+      id: 10, 
+      datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
+      duration: Duration::minutes(5)
+    };
+
+    let result = find_intersection_beginning(&a, &b);
+
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().time(), NaiveTime::from_hms(0, 24, 0));
   }
 }
