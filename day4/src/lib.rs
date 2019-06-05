@@ -1,6 +1,7 @@
 use std::cmp::{Ordering, max};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
+use std::iter::FromIterator;
 use std::collections::HashMap;
 
 use regex::Regex;
@@ -27,6 +28,18 @@ struct AsleepRecord {
   datetime: DateTime<Utc>,
   duration: Duration
 }
+
+// impl FromIterator<AsleepRecord> for Vec<AsleepRecord> {
+//   fn from_iter<I: IntoIterator<Item=AsleepRecord>>(iter: I) -> Self {
+//     let v = Vec::new();
+
+//     for i in iter {
+//       v.push(i);
+//     }
+
+//     v
+//   }
+// }
 
 fn parse(input: &String) -> Result<Record, String> {
   let datetime_re = Regex::new(r"\[(\d+)-(\d+)-(\d+)\s(\d+):(\d+)\]")
@@ -158,16 +171,43 @@ fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<Dat
   }
 }
 
-fn calc_part1(records: &Vec<Record>) -> usize {
+pub fn calc_part1(records: &Vec<Record>) -> usize {
   let sleep_records = filter_map_asleep(&records);
   let sleepiest_id = find_sleepiest(&sleep_records)
     .unwrap();
 
-  sleep_records
+  let sleepiest_records: Vec<AsleepRecord> = sleep_records
+    .into_iter()
+    .filter(|r| r.id == sleepiest_id)
+    .collect();
+  
+  let sleepiest_minute: usize = sleepiest_records
     .iter()
-    .filter(|r| r.id == sleepiest_id);
+    .take(sleepiest_records.len() - 1)
+    .enumerate()
+    .flat_map(|(i, a)| {
+      sleepiest_records
+        .iter()
+        .skip(i + 1)
+        .filter_map(move |b| find_intersection_beginning(a, b))
+    })
+    .fold(HashMap::new() as HashMap<NaiveTime, usize>, |mut map, datetime| {
+      let entry = map.entry(datetime.time()).or_insert(0);
+      *entry += 1;
 
-  0
+      map
+    })
+    .iter()
+    .max_by(|(_, a_count), (_, b_count)| if a_count < b_count {
+      Ordering::Less
+    } else {
+      Ordering::Greater
+    })
+    .map(|(t, _)| t.minute() as usize)
+    .expect("cound not calculate the sleepies minute");
+
+
+  sleepiest_id * sleepiest_minute
 }
 
 #[cfg(test)]
@@ -367,5 +407,79 @@ mod tests {
 
     assert!(result.is_some());
     assert_eq!(result.unwrap().time(), NaiveTime::from_hms(0, 24, 0));
+  }
+
+  #[test]
+  fn calc_part1_test() {
+    assert_eq!(240, calc_part1(&vec![
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 0, 0),
+        action: Action::Shift(10)
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 25, 0),
+        action: Action::WakeUp
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 30, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 55, 0),
+        action: Action::WakeUp
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(23, 58, 0),
+        action: Action::Shift(99)
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 2).and_hms(0, 40, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 2).and_hms(0, 50, 0),
+        action: Action::WakeUp
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 3).and_hms(0, 5, 0),
+        action: Action::Shift(10)
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 3).and_hms(0, 29, 0),
+        action: Action::WakeUp
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 4).and_hms(0, 2, 0),
+        action: Action::Shift(99)
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 4).and_hms(0, 36, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 4).and_hms(0, 46, 0),
+        action: Action::WakeUp
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 5).and_hms(0, 3, 0),
+        action: Action::Shift(99)
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 5).and_hms(0, 45, 0),
+        action: Action::FallAsleep
+      },
+      Record { 
+        datetime: Utc.ymd(1518, 11, 5).and_hms(0, 55, 0),
+        action: Action::WakeUp
+      },
+    ]));
   }
 }
