@@ -158,6 +158,18 @@ fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<Dat
   }
 }
 
+fn calc_part1(records: &Vec<Record>) -> usize {
+  let sleep_records = filter_map_asleep(&records);
+  let sleepiest_id = find_sleepiest(&sleep_records)
+    .unwrap();
+
+  sleep_records
+    .iter()
+    .filter(|r| r.id == sleepiest_id);
+
+  0
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
