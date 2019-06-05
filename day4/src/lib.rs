@@ -2,6 +2,7 @@ use std::cmp::{Ordering, max};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::collections::HashMap;
+use std::time::Duration;
 
 use regex::Regex;
 use chrono::prelude::*;
@@ -17,6 +18,16 @@ enum Action {
 pub struct Record {
   datetime: DateTime<Utc>,
   action: Action,
+}
+
+// struct RegressionVec {
+//   size: usize,
+  
+// }
+
+struct TimeSpan {
+  datetime: DateTime<Utc>,
+  duration: Duration,
 }
 
 fn parse(input: &String) -> Result<Record, String> {
@@ -81,36 +92,33 @@ pub fn read_input(filepath: &str) -> Result<Vec<Record>, String> {
   Ok(claim_results)
 }
 
-fn filter_map_records(records: &Vec<Record>) -> HashMap<usize, HashMap<u8, usize>> {
+fn filter_map_asleep(records: &Vec<Record>) -> Vec<(usize, DateTime<Utc>, Duration)> {
   records
     .iter()
-    .fold((0, HashMap::new() as HashMap<usize, HashMap<u8, usize>>), |(id, mut map), r| {
-      let id = match r.action {
-        Action::Shift(new_id) => new_id,
-        Action::FallAsleep | Action::WakeUp => {
-          if r.datetime.time().hour() == 0 {
-            let target_minute = if r.action == Action::WakeUp {
-              max(r.datetime.time().minute() - 1, 0) as u8
-            } else {
-              r.datetime.time().minute() as u8
-            };
-
-            let count = map
-              .entry(id)
-              .or_insert(HashMap::new())
-              .entry(target_minute)
-              .or_insert(0);
-
-            *count += 1;
-          }
-
-          id
+    .scan((0_usize, Utc::now()), |(id, start), r| {
+      match r.action {
+        Action::Shift(new_id) => {
+          *id = new_id;
+          Some(None)
         },
-      };
-
-      (id, map)
+        Action::FallAsleep => {
+          *start = r.datetime;
+          Some(None)
+        },
+        Action::WakeUp => {
+          // ToDo: is this enough to describe the problem?
+          let duration = Duration::new(
+            (r.datetime.time().minute() - start.time().minute()) as u64, 
+            0
+          );
+          
+          Some(Some((*id, *start, duration )))
+        }
+      }
     })
-    .1
+    .filter_map(|o| o)
+    .filter(|(_, start, _)| start.time().hour() == 0)
+    .collect()
 }
 
 #[cfg(test)]
@@ -150,7 +158,7 @@ mod tests {
   }
 
   #[test]
-  fn filter_map_records_test() {
+  fn filter_map_asleep_test() {
     let v = vec![
       Record { 
         datetime: Utc.ymd(1518, 11, 1).and_hms(0, 0, 0),
@@ -221,5 +229,14 @@ mod tests {
         action: Action::WakeUp
       },
     ];
+
+    assert_eq!(filter_map_asleep(&v), vec![
+      (10, Utc.ymd(1518, 11, 1).and_hms(0, 5, 0), Duration::new(20, 0)),
+      (10, Utc.ymd(1518, 11, 1).and_hms(0, 30, 0), Duration::new(25, 0)),
+      (99, Utc.ymd(1518, 11, 2).and_hms(0, 40, 0), Duration::new(10, 0)),
+      (10, Utc.ymd(1518, 11, 3).and_hms(0, 24, 0), Duration::new(5, 0)),
+      (99, Utc.ymd(1518, 11, 4).and_hms(0, 36, 0), Duration::new(10, 0)),
+      (99, Utc.ymd(1518, 11, 5).and_hms(0, 45, 0), Duration::new(10, 0)),
+    ]);
   }
 }
