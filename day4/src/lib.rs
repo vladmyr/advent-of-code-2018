@@ -1,8 +1,8 @@
 use std::cmp::{Ordering, max};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
-use std::collections::HashMap;
 use std::time::Duration;
+use std::collections::HashMap;
 
 use regex::Regex;
 use chrono::prelude::*;
@@ -20,14 +20,11 @@ pub struct Record {
   action: Action,
 }
 
-// struct RegressionVec {
-//   size: usize,
-  
-// }
-
-struct TimeSpan {
+#[derive(Debug, PartialEq)]
+struct AsleepRecord {
+  id: usize,
   datetime: DateTime<Utc>,
-  duration: Duration,
+  duration: Duration
 }
 
 fn parse(input: &String) -> Result<Record, String> {
@@ -92,7 +89,7 @@ pub fn read_input(filepath: &str) -> Result<Vec<Record>, String> {
   Ok(claim_results)
 }
 
-fn filter_map_asleep(records: &Vec<Record>) -> Vec<(usize, DateTime<Utc>, Duration)> {
+fn filter_map_asleep(records: &Vec<Record>) -> Vec<AsleepRecord> {
   records
     .iter()
     .scan((0_usize, Utc::now()), |(id, start), r| {
@@ -106,19 +103,43 @@ fn filter_map_asleep(records: &Vec<Record>) -> Vec<(usize, DateTime<Utc>, Durati
           Some(None)
         },
         Action::WakeUp => {
-          // ToDo: is this enough to describe the problem?
+          // ToDo: is this enough to fully describe the problem?
           let duration = Duration::new(
             (r.datetime.time().minute() - start.time().minute()) as u64, 
             0
           );
           
-          Some(Some((*id, *start, duration )))
+          Some(Some(AsleepRecord {
+            id: *id, 
+            datetime: *start, 
+            duration 
+          }))
         }
       }
     })
     .filter_map(|o| o)
-    .filter(|(_, start, _)| start.time().hour() == 0)
+    .filter(|r| r.datetime.time().hour() == 0)
     .collect()
+}
+
+fn find_sleepiest(records: &Vec<AsleepRecord>) -> Option<usize> {
+  records
+    .iter()
+    .fold(HashMap::new() as HashMap<usize, u64>, |mut map, r| {
+      let entry = map.entry(r.id).or_insert(0);
+      *entry += r.duration.as_secs();
+
+      map
+    })
+    .iter()
+    .fold(None as Option<(usize, u64)>, |acc, (&r_id, &r_count)| {
+      match acc {
+        None => Some((r_id, r_count)),
+        Some((_, count)) if r_count > count => Some((r_id, r_count)),
+        Some(t) => Some(t),
+      }
+    })
+    .map(|(id, _)| id)
 }
 
 #[cfg(test)]
@@ -231,12 +252,72 @@ mod tests {
     ];
 
     assert_eq!(filter_map_asleep(&v), vec![
-      (10, Utc.ymd(1518, 11, 1).and_hms(0, 5, 0), Duration::new(20, 0)),
-      (10, Utc.ymd(1518, 11, 1).and_hms(0, 30, 0), Duration::new(25, 0)),
-      (99, Utc.ymd(1518, 11, 2).and_hms(0, 40, 0), Duration::new(10, 0)),
-      (10, Utc.ymd(1518, 11, 3).and_hms(0, 24, 0), Duration::new(5, 0)),
-      (99, Utc.ymd(1518, 11, 4).and_hms(0, 36, 0), Duration::new(10, 0)),
-      (99, Utc.ymd(1518, 11, 5).and_hms(0, 45, 0), Duration::new(10, 0)),
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
+        duration: Duration::new(20, 0)
+      },
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 30, 0),
+        duration: Duration::new(25, 0)
+      },
+      AsleepRecord { 
+        id: 99, 
+        datetime: Utc.ymd(1518, 11, 2).and_hms(0, 40, 0),
+        duration: Duration::new(10, 0)
+      },
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
+        duration: Duration::new(5, 0)
+      },
+      AsleepRecord { 
+        id: 99, 
+        datetime: Utc.ymd(1518, 11, 4).and_hms(0, 36, 0),
+        duration: Duration::new(10, 0)
+      },
+      AsleepRecord {
+        id: 99,
+        datetime: Utc.ymd(1518, 11, 5).and_hms(0, 45, 0),
+        duration: Duration::new(10, 0)
+      },
     ]);
+  }
+
+  #[test]
+  fn find_sleepiest_test() {
+    assert_eq!(Some(10), find_sleepiest(&vec![
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 5, 0),
+        duration: Duration::new(20, 0)
+      },
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 1).and_hms(0, 30, 0),
+        duration: Duration::new(25, 0)
+      },
+      AsleepRecord { 
+        id: 99, 
+        datetime: Utc.ymd(1518, 11, 2).and_hms(0, 40, 0),
+        duration: Duration::new(10, 0)
+      },
+      AsleepRecord { 
+        id: 10, 
+        datetime: Utc.ymd(1518, 11, 3).and_hms(0, 24, 0),
+        duration: Duration::new(5, 0)
+      },
+      AsleepRecord { 
+        id: 99, 
+        datetime: Utc.ymd(1518, 11, 4).and_hms(0, 36, 0),
+        duration: Duration::new(10, 0)
+      },
+      AsleepRecord {
+        id: 99,
+        datetime: Utc.ymd(1518, 11, 5).and_hms(0, 45, 0),
+        duration: Duration::new(10, 0)
+      },
+    ]));
   }
 }
