@@ -145,8 +145,6 @@ fn find_sleepiest(records: &Vec<AsleepRecord>) -> Option<usize> {
 fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<DateTime<Utc>> {
   let a_end = a.datetime.checked_add_signed(a.duration)?;
   let b_end = b.datetime.checked_add_signed(b.duration)?;
-    
-  println!("{:?}, {:?}", a_end, b_end);
 
   match (
     a.datetime.time().lt(&b.datetime.time()) 
