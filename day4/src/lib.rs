@@ -1,7 +1,6 @@
-use std::cmp::{Ordering, max};
+use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
-use std::iter::FromIterator;
 use std::collections::HashMap;
 
 use regex::Regex;
@@ -29,22 +28,10 @@ struct AsleepRecord {
   duration: Duration
 }
 
-// impl FromIterator<AsleepRecord> for Vec<AsleepRecord> {
-//   fn from_iter<I: IntoIterator<Item=AsleepRecord>>(iter: I) -> Self {
-//     let v = Vec::new();
-
-//     for i in iter {
-//       v.push(i);
-//     }
-
-//     v
-//   }
-// }
-
 fn parse(input: &String) -> Result<Record, String> {
   let datetime_re = Regex::new(r"\[(\d+)-(\d+)-(\d+)\s(\d+):(\d+)\]")
     .map_err(|e| e.to_string())?;
-  let shift_re = Regex::new(r".+#(\d)+.+")
+  let shift_re = Regex::new(r".+#(\d+).+")
     .map_err(|e| e.to_string())?;
 
   if input.len() < 18 {
@@ -94,7 +81,7 @@ pub fn read_input(filepath: &str) -> Result<Vec<Record>, String> {
     .map(|line_r| parse(&line_r.map_err(|e| e.to_string())?))
     .collect::<Result<Vec<Record>, _>>()?;
     
-  claim_results.sort_by(|a, b| if a.datetime < b.datetime { 
+  claim_results.sort_by(|a, b| if a.datetime.lt(&b.datetime) { 
       Ordering::Less 
     } else { 
       Ordering::Greater 
@@ -180,7 +167,7 @@ pub fn calc_part1(records: &Vec<Record>) -> usize {
     .into_iter()
     .filter(|r| r.id == sleepiest_id)
     .collect();
-  
+
   let sleepiest_minute: usize = sleepiest_records
     .iter()
     .take(sleepiest_records.len() - 1)
@@ -205,7 +192,6 @@ pub fn calc_part1(records: &Vec<Record>) -> usize {
     })
     .map(|(t, _)| t.minute() as usize)
     .expect("cound not calculate the sleepies minute");
-
 
   sleepiest_id * sleepiest_minute
 }
