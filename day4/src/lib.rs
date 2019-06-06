@@ -142,15 +142,15 @@ fn find_sleepiest(records: &Vec<AsleepRecord>) -> Option<usize> {
     .map(|(id, _)| id)
 }
 
-fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<DateTime<Utc>> {
+fn get_is_intersecting(a: &AsleepRecord, t: &NaiveTime) -> Option<bool> {
   let a_end = a.datetime.checked_add_signed(a.duration)?;
-  let b_end = b.datetime.checked_add_signed(b.duration)?;
+  Some(a.datetime.time().lt(&t) && t.lt(&a_end.time()))
+}
 
+fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<DateTime<Utc>> {
   match (
-    a.datetime.time().lt(&b.datetime.time()) 
-      && b.datetime.time().lt(&a_end.time()),
-    b.datetime.time().lt(&a.datetime.time())
-      && a.datetime.time().lt(&b_end.time()),
+    get_is_intersecting(a, &b.datetime.time())?,
+    get_is_intersecting(b, &a.datetime.time())?,
   ) {
     (false, true) => Some(a.datetime),
     (true, false) => Some(b.datetime),
@@ -158,22 +158,13 @@ fn find_intersection_beginning(a: &AsleepRecord, b: &AsleepRecord) -> Option<Dat
   }
 }
 
-pub fn calc_part1(records: &Vec<Record>) -> usize {
-  let sleep_records = filter_map_asleep(&records);
-  let sleepiest_id = find_sleepiest(&sleep_records)
-    .unwrap();
-
-  let sleepiest_records: Vec<AsleepRecord> = sleep_records
-    .into_iter()
-    .filter(|r| r.id == sleepiest_id)
-    .collect();
-
-  let sleepiest_minute: usize = sleepiest_records
+fn find_sleepiest_minute(records: &Vec<AsleepRecord>) -> Option<u8> {
+  records
     .iter()
-    .take(sleepiest_records.len() - 1)
+    .take(records.len() - 1)
     .enumerate()
     .flat_map(|(i, a)| {
-      sleepiest_records
+      records
         .iter()
         .skip(i + 1)
         .filter_map(move |b| find_intersection_beginning(a, b))
@@ -190,8 +181,55 @@ pub fn calc_part1(records: &Vec<Record>) -> usize {
     } else {
       Ordering::Greater
     })
-    .map(|(t, _)| t.minute() as usize)
-    .expect("cound not calculate the sleepies minute");
+    .map(|(t, _)| t.minute() as u8)
+}
+
+fn find_sleepiest_id(records: &Vec<AsleepRecord>, t: &NaiveTime) -> Option<usize> {
+  records
+    .iter()
+    .filter(|r| match get_is_intersecting(&r, &t) {
+      Some(b) => b,
+      _ => false,
+    })
+    .map(|r| r.id)
+    .fold(HashMap::new() as HashMap<usize, usize>, |mut map, id| {
+      let entry = map.entry(id).or_insert(0);
+      *entry += 1;
+
+      map
+    })
+    .iter()
+    .max_by(|(_, a_count), (_, b_count)| if a_count < b_count {
+      Ordering::Less
+    } else {
+      Ordering::Greater
+    })
+    .map(|(id, _)| *id)
+}
+
+pub fn calc_part1(records: &Vec<Record>) -> usize {
+  let sleep_records = filter_map_asleep(&records);
+  let sleepiest_id = find_sleepiest(&sleep_records)
+    .unwrap();
+
+  let sleepiest_records: Vec<AsleepRecord> = sleep_records
+    .into_iter()
+    .filter(|r| r.id == sleepiest_id)
+    .collect();
+
+  let sleepiest_minute: usize = find_sleepiest_minute(&sleepiest_records)
+    .expect("cound not calculate the sleepies minute") as usize;
+
+  sleepiest_id * sleepiest_minute
+}
+
+pub fn calc_part2(records: &Vec<Record>) -> usize {
+  let sleep_records = filter_map_asleep(&records);
+  let sleepiest_minute: usize = find_sleepiest_minute(&sleep_records)
+    .expect("cound not calculate the sleepies minute") as usize;
+  let t = NaiveTime::from_hms(0, sleepiest_minute as u32, 0);
+  let sleepiest_id = find_sleepiest_id(&sleep_records, &t)
+    .expect("count not calculate the sleepiest id");
 
   sleepiest_id * sleepiest_minute
 }
