@@ -1,13 +1,21 @@
 use std::fs::File;
 use std::io::prelude::*;
+use std::collections::HashSet;
 use std::collections::BinaryHeap;
 
-pub fn read_input(filepath: &str) -> Result<Vec<char>, String> {
+pub fn read_input(filepath: &str) -> Result<(HashSet<char>, Vec<char>), String> {
   let mut file = File::open(filepath).map_err(|e| e.to_string())?;
   let mut contents = String::new();
   file.read_to_string(&mut contents).map_err(|e| e.to_string())?;
 
-  Ok(contents.chars().collect())
+  Ok(contents
+    .chars()
+    .fold((HashSet::new(), Vec::new()), |(mut s, mut v), c| {
+      s.insert(c.to_ascii_lowercase());
+      v.push(c);
+
+      (s, v)
+    }))
 }
 
 fn get_is_matching(a: &char, b: &char) -> bool {
@@ -34,6 +42,20 @@ pub fn calc_part1(input: &Vec<char>) -> usize {
   heap.len()
 }
 
+pub fn calc_part2((s, v): &(HashSet<char>, Vec<char>)) -> usize {
+  s
+    .iter()
+    .map(|c| calc_part1(
+      &v
+        .into_iter()
+        .cloned()
+        .filter(|v_c| *c != v_c.to_ascii_lowercase() )
+        .collect::<Vec<char>>()
+    ))
+    .min()
+    .unwrap_or(0)
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -51,5 +73,22 @@ mod tests {
   #[test]
   fn calc_part1_test() {
     assert_eq!(calc_part1(&String::from("dabAcCaCBAcCcaDA").chars().collect()), 10);
+  }
+
+  #[test]
+  fn to_lowercase_test() {
+    assert_eq!('c', 'c'.to_ascii_lowercase());
+    assert_eq!('c', 'C'.to_ascii_lowercase());
+  }
+
+  #[test]
+  fn calc_part2_test() {
+    assert_eq!(
+      4,
+      calc_part2(&(
+        ['a', 'b', 'c', 'd'].into_iter().cloned().collect(),
+        String::from("dabAcCaCBAcCcaDA").chars().collect()
+      ))
+    );
   }
 }
