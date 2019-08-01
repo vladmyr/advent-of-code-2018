@@ -1,7 +1,7 @@
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::cmp;
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 
 pub fn read_input(filepath: &str) -> Result<Vec<(u64, u64)>, String> {
   let file = File::open(filepath).map_err(|e| e.to_string())?;
@@ -85,6 +85,26 @@ fn calc_area(input: &Vec<(u64, u64)>) -> HashMap<(u64, u64), u64> {
     })
 }
 
+fn calc_safe_region(input: &Vec<(u64, u64)>, watermark: &u64) -> u64 {
+  let (x, y) = calc_grid_size(input);
+
+  (0..=x)
+    .flat_map(|c| (0..=y)
+      .map(move |r| (c, r)))
+    .fold(0_u64, |mut count, target| {
+      let d_sum = input
+        .iter()
+        .map(|coord| calc_distance(&target, coord))
+        .sum::<u64>();
+
+      if d_sum < *watermark {
+        count += 1;
+      }
+
+      count
+    })
+}
+
 pub fn calc_part1(input: &Vec<(u64, u64)>) -> u64 {
   calc_area(input)
     .into_iter()
@@ -92,6 +112,10 @@ pub fn calc_part1(input: &Vec<(u64, u64)>) -> u64 {
     .map(|(_, v)| v)
     .max_by(|v1, v2| v1.cmp(v2))
     .unwrap_or(0)
+}
+
+pub fn calc_part2(input: &Vec<(u64, u64)>, watermark: &u64) -> u64 {
+  calc_safe_region(input, watermark)
 }
 
 #[cfg(test)]
