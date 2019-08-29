@@ -12,9 +12,7 @@ pub fn read_input(filepath: &str) -> Result<Vec<(char, char)>, String> {
   io::BufReader::new(file)
     .lines()
     .map(|line_r| parse(&line_r.map_err(|e| e.to_string())?))
-    ;
-
-  Ok(vec![('A', 'B')])
+    .collect::<Result<Vec<(char, char)>, _>>()
 }
 
 fn parse(input: &String) -> Result<(char, char), String> {
@@ -22,36 +20,60 @@ fn parse(input: &String) -> Result<(char, char), String> {
     static ref CHARS_RE: Regex = Regex::new(r"Step ([A-Z]{1}) must be finished before step ([A-Z]{1}) can begin.").unwrap();
   }
 
-  CHARS_RE
+  let captures = CHARS_RE
     .captures(input)
-    .ok_or("could not parse line")?
+    .ok_or("could not parse line")?;
+
+  let mut chr_iter = captures
     .iter()
     .skip(1)
+    .take(2)
     .map(|o| o.unwrap())
-    .map(|m| m.as_str().as_bytes()[0] as char)
-    .enumerate()
-    .scan('_' as char, |left, (idx, chr)| -> Option<(char, char)> {
-      match idx {
-        0 => {
-          *left = chr;
-          None
-        },
-        1 => Some((*left, chr)),
-        _ => None,
-      }
-    })
-    .last()
-    .ok_or("could not produce a tuple".to_string())
+    .map(|m| m.as_str().as_bytes()[0] as char);
+
+  let left = chr_iter.next().ok_or("error unpacking left character")?;
+  let right = chr_iter.next().ok_or("error unpacking right character")?;
+
+  Ok((left, right))
 }
 
 #[cfg(test)]
 mod tests {
+  use super::*;
+
   #[test]
-  fn it_works() {
-    assert_eq!(2 + 2, 4);
+  fn parse_test_001() {
+    let input = "Step T must be finished before step X can begin.";
+    let expected = Ok(('T', 'X'));
+    let actual = parse(&input.to_string());
+
+    assert_eq!(expected, actual);
   }
 
-  fn parse_test_001() {
-    
+  #[test]
+  fn parse_test_002() {
+    let input = "Step T must be finished before step _ can begin.";
+    let expected = Err("could not parse line".to_string());
+    let actual = parse(&input.to_string());
+
+    assert_eq!(expected, actual);
+  }
+
+  #[test]
+  fn parse_test_003() {
+    let input = "Step T must be finished before step 🔥 can begin.";
+    let expected = Err("could not parse line".to_string());
+    let actual = parse(&input.to_string());
+
+    assert_eq!(expected, actual);
+  }
+
+  #[test]
+  fn parse_test_004() {
+    let input = "Random content.";
+    let expected = Err("could not parse line".to_string());
+    let actual = parse(&input.to_string());
+
+    assert_eq!(expected, actual);
   }
 }
